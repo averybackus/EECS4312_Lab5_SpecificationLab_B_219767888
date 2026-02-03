@@ -1,6 +1,6 @@
 ## TODO:
-## Student Name:
-## Student ID: 
+## Student Name: Avery Backus
+## Student ID: 219767888
 
 # Is Resource Allocation Feasible Lab Repository
 
