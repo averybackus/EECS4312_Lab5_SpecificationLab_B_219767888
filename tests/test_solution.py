@@ -1,5 +1,5 @@
-## Student Name:
-## Student ID: 
+## Student Name: Avery Backus
+## Student ID: 219767888
 
 """
 Public test suite for the meeting slot suggestion exercise.
@@ -46,3 +46,41 @@ def test_non_dict_request_raises():
         is_allocation_feasible(resources, requests)
 
 """TODO: Add at least 5 additional test cases to test your implementation."""
+
+def test_empty_requests_is_feasible():
+    resources = {"cpu": 4, "mem": 8}
+    requests = []
+    assert is_allocation_feasible(resources, requests) is True
+
+
+def test_exact_capacity_boundary_is_feasible():
+    resources = {"cpu": 10}
+    requests = [{"cpu": 4}, {"cpu": 6}]
+    assert is_allocation_feasible(resources, requests) is True
+
+
+def test_empty_resources_with_no_requests_is_feasible():
+    resources = {}
+    requests = []
+    assert is_allocation_feasible(resources, requests) is True
+
+
+def test_negative_request_amount_raises():
+    resources = {"cpu": 10}
+    requests = [{"cpu": -1}]
+    with pytest.raises(ValueError):
+        is_allocation_feasible(resources, requests)
+
+
+def test_negative_resource_capacity_raises():
+    resources = {"cpu": -5}
+    requests = [{"cpu": 1}]
+    with pytest.raises(ValueError):
+        is_allocation_feasible(resources, requests)
+
+
+def test_float_amounts_feasible():
+    resources = {"cpu": 5.0, "mem": 3.5}
+    requests = [{"cpu": 1.2, "mem": 1.0}, {"cpu": 3.8, "mem": 2.5}]
+    assert is_allocation_feasible(resources, requests) is True
+
