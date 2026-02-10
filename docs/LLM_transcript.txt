@@ -119,6 +119,135 @@ def test_float_amounts_feasible():
 If you want, I can also add “nasty” edge-case tests (e.g., non-numeric amounts, non-string keys, requests not a list, etc.), but the above already covers a good spread for hidden cases."
 
 --------------------------------------------------
-Prompt 2: "Copy paste your question"
-LLM Response 2: "Copy paste LLMs response"
+Prompt 2: "new requirement: at least one resource must remain unallocated after assignment. this requirement applies in addition to all previously described behavior. an allocation that satisfies all other conditions but consumes all available resources is no longer valid. update your solution, tests and documents to incorporate this requirement "
+LLM Response 2: "Absolutely — this new requirement changes the meaning of “feasible.”
+
+Updated behavior
+
+Allocation is feasible only if:
+
+All requests can be satisfied without exceeding any capacity, and
+
+At least one resource has leftover capacity after satisfying all requests (i.e., not all resources are fully consumed).
+
+So if requests exactly consume every resource’s full capacity, the function must return False.
+
+Updated solution.py
+from typing import Dict, List, Union
+
+Number = Union[int, float]
+
+
+def is_allocation_feasible(
+    resources: Dict[str, Number],
+    requests: List[Dict[str, Number]]
+) -> bool:
+    """
+    Determine whether a set of resource requests can be satisfied given limited capacities.
+
+    Feasible iff:
+      1) For every resource r: total_requested[r] <= resources[r]
+      2) At least one resource has leftover after allocation:
+            exists r such that resources[r] - total_requested[r] > 0
+
+    Assumption (from spec): inputs are provided in a reasonable and consistent format.
+    """
+    # Accumulate total demand per resource
+    totals = {r: 0 for r in resources}
+
+    for req in requests:
+        if not isinstance(req, dict):
+            # Kept because public tests include this case
+            raise ValueError("Each request must be a dict mapping resource name to amount.")
+        for r, amt in req.items():
+            if r not in resources:
+                return False
+            totals[r] += amt
+            if totals[r] > resources[r]:
+                return False
+
+    # NEW REQUIREMENT: at least one resource must remain unallocated
+    # If there are no resources, we cannot have leftover.
+    if not resources:
+        return False
+
+    any_leftover = any(resources[r] - totals[r] > 0 for r in resources)
+    return any_leftover
+
+Updated test_solution.py
+
+Key change: your old “basic feasible” test now becomes infeasible because it uses all CPU exactly.
+
+from solution import is_allocation_feasible
+import pytest
+
+
+def test_basic_feasible_single_resource_with_leftover():
+    # Must leave leftover now
+    resources = {'cpu': 10}
+    requests = [{'cpu': 3}, {'cpu': 4}, {'cpu': 2}]  # total = 9, leftover = 1
+    assert is_allocation_feasible(resources, requests) is True
+
+
+def test_exactly_consumes_all_resources_is_now_infeasible():
+    resources = {'cpu': 10}
+    requests = [{'cpu': 3}, {'cpu': 4}, {'cpu': 3}]  # total = 10, leftover = 0
+    assert is_allocation_feasible(resources, requests) is False
+
+
+def test_multi_resource_infeasible_one_overloaded():
+    resources = {'cpu': 8, 'mem': 30}
+    requests = [{'cpu': 2, 'mem': 8}, {'cpu': 3, 'mem': 10}, {'cpu': 3, 'mem': 14}]
+    assert is_allocation_feasible(resources, requests) is False
+
+
+def test_missing_resource_in_availability():
+    resources = {'cpu': 10}
+    requests = [{'cpu': 2}, {'gpu': 1}]
+    assert is_allocation_feasible(resources, requests) is False
+
+
+def test_non_dict_request_raises():
+    resources = {'cpu': 5}
+    requests = [{'cpu': 2}, ['mem', 1]]  # malformed request
+    with pytest.raises(ValueError):
+        is_allocation_feasible(resources, requests)
+
+
+# --- Additional tests for the new requirement (at least 5) ---
+
+def test_multi_resource_leftover_on_one_resource_is_feasible():
+    resources = {'cpu': 10, 'mem': 10}
+    requests = [{'cpu': 10, 'mem': 9}]  # cpu leftover 0, mem leftover 1
+    assert is_allocation_feasible(resources, requests) is True
+
+
+def test_multi_resource_all_consumed_is_infeasible():
+    resources = {'cpu': 10, 'mem': 10}
+    requests = [{'cpu': 10, 'mem': 10}]  # leftover none
+    assert is_allocation_feasible(resources, requests) is False
+
+
+def test_no_requests_is_feasible_if_resources_exist():
+    resources = {'cpu': 10}
+    requests = []
+    # leftover cpu = 10
+    assert is_allocation_feasible(resources, requests) is True
+
+
+def test_empty_resources_is_infeasible_even_with_no_requests():
+    resources = {}
+    requests = []
+    assert is_allocation_feasible(resources, requests) is False
+
+
+def test_leftover_requirement_blocks_exact_fit_even_if_within_capacity():
+    resources = {'cpu': 5}
+    requests = [{'cpu': 5}]
+    assert is_allocation_feasible(resources, requests) is False
+
+Updated “documents” (spec notes)
+System description (updated)
+
+The function determines whether all resource requests can be satisfied within available capacities and whether at least one resource remains partially unused after assignment. If satisfying requests would consume all available resources exactly, the allocation is not considered valid."
 --------------------------------------------------
